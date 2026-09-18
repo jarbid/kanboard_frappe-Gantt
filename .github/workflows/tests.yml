@@ -9,13 +9,15 @@ jobs:
   tests:
     name: Unit tests (${{ matrix.database }})
     runs-on: ubuntu-latest
-    container: kanboard/tests:latest
 
     strategy:
       fail-fast: false
       matrix:
         database: [sqlite, postgres, mysql]
 
+    # Both service containers start for every matrix leg, including sqlite.
+    # Services cannot be selected per matrix value, and the couple of seconds
+    # this costs is not worth splitting the job in two to avoid.
     services:
       postgres:
         image: postgres:16
@@ -23,6 +25,8 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -31,7 +35,9 @@ jobs:
       mariadb:
         image: mariadb:11
         env:
-          MYSQL_ROOT_PASSWORD: secret
+          MARIADB_ROOT_PASSWORD: secret
+        ports:
+          - 3306:3306
         options: >-
           --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 10s
@@ -49,25 +55,45 @@ jobs:
         with:
           path: plugins/FrappeGantt
 
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, gd, xml, dom, simplexml, zip, pdo_sqlite, pdo_mysql, pdo_pgsql
+          coverage: none
+
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
+
+      # Kanboard's test bootstrap drops and recreates the test database before
+      # every test, so the database has to exist before the first one runs.
+      - name: Create the test database
+        if: matrix.database == 'postgres'
+        env:
+          PGPASSWORD: postgres
+        run: psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE kanboard_unit_test;'
+
+      - name: Create the test database
+        if: matrix.database == 'mysql'
+        run: mysql -h 127.0.0.1 -u root -psecret -e 'CREATE DATABASE kanboard_unit_test;'
 
       - name: Run the test suite
         run: ./vendor/bin/phpunit -c tests/units.${{ matrix.database }}.xml plugins/FrappeGantt/Test/
         env:
-          DB_HOSTNAME: ${{ matrix.database == 'postgres' && 'postgres' || 'mariadb' }}
+          DB_HOSTNAME: 127.0.0.1
           DB_USERNAME: ${{ matrix.database == 'postgres' && 'postgres' || 'root' }}
           DB_PASSWORD: ${{ matrix.database == 'postgres' && 'postgres' || 'secret' }}
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Check PHP syntax
         run: |
-          set -e
+          set -euo pipefail
           find . -name '*.php' -not -path './.git/*' -print0 \
             | xargs -0 -n1 php -l > /dev/null
 
