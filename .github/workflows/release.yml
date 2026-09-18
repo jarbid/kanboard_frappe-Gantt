@@ -1,11 +1,16 @@
 name: Release
 
-# Pushing a v* tag publishes the installable plugin archive to the releases
-# page, which is where the README tells people to get it.
+# Publishes the installable plugin archive to the releases page, which is
+# where the install instructions send people.
+#
+# Either push a v* tag, or run this workflow manually — run manually and it
+# reads the version from Plugin.php and creates the matching tag itself, so
+# the tag and the plugin's declared version can never disagree.
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -18,59 +23,107 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Check the plugin version matches the tag
+      - name: Resolve the version
+        id: version
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
           declared="$(grep -A2 'function getPluginVersion' Plugin.php | grep -oP "return '\K[^']+")"
-          echo "tag=${tag} declared=${declared}"
-          if [ "${tag}" != "${declared}" ]; then
-            echo "::error::Plugin.php declares ${declared} but the tag is ${tag}"
+
+          if [ -z "${declared}" ]; then
+            echo "::error::could not read getPluginVersion() from Plugin.php"
             exit 1
           fi
 
-      - name: Build the archive
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            tag="${GITHUB_REF_NAME}"
+            if [ "${tag#v}" != "${declared}" ]; then
+              echo "::error::Plugin.php declares ${declared} but the tag is ${tag}"
+              exit 1
+            fi
+          else
+            tag="v${declared}"
+          fi
+
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${declared}" >> "$GITHUB_OUTPUT"
+          echo "Releasing ${tag}"
+
+      - name: Create the tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          # export-ignore rules in .gitattributes keep this to the files a
+          if git rev-parse -q --verify "refs/tags/${TAG}" > /dev/null; then
+            echo "::error::${TAG} already exists — bump getPluginVersion() in Plugin.php first"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "${TAG}"
+          git push origin "${TAG}"
+
+      - name: Build the archive
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # The export-ignore rules in .gitattributes keep this to the files a
           # Kanboard installation actually loads.
-          git archive HEAD --prefix=FrappeGantt/ --format=zip \
-            -o "FrappeGantt-${GITHUB_REF_NAME}.zip"
-          unzip -l "FrappeGantt-${GITHUB_REF_NAME}.zip"
+          git archive HEAD --prefix=FrappeGantt/ --format=zip -o "FrappeGantt-${TAG}.zip"
+          unzip -l "FrappeGantt-${TAG}.zip"
 
       - name: Sanity-check the archive
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          zip="FrappeGantt-${GITHUB_REF_NAME}.zip"
+          zip="FrappeGantt-${TAG}.zip"
+
           # Kanboard derives the plugin namespace from the directory name, so
-          # Plugin.php has to unpack to exactly plugins/FrappeGantt/Plugin.php.
+          # this has to unpack to exactly plugins/FrappeGantt/Plugin.php.
           for required in \
             FrappeGantt/Plugin.php \
-            FrappeGantt/Assets/vendor/frappe-gantt.umd.js \
             FrappeGantt/Assets/kanboard-gantt.js \
+            FrappeGantt/Assets/kanboard-gantt.css \
+            FrappeGantt/Assets/vendor/frappe-gantt.umd.js \
+            FrappeGantt/Assets/vendor/frappe-gantt.css \
             FrappeGantt/Schema/Sqlite.php \
             FrappeGantt/Schema/Mysql.php \
             FrappeGantt/Schema/Postgres.php \
             FrappeGantt/Schema/Mssql.php \
+            FrappeGantt/Schema/Dblib.php \
+            FrappeGantt/Schema/Odbc.php \
             FrappeGantt/Template/gantt/chart.php
           do
             unzip -l "$zip" | grep -q " ${required}$" \
               || { echo "::error::${required} is missing from the archive"; exit 1; }
           done
+
           # Development-only files must not ship.
           if unzip -l "$zip" | grep -qE " FrappeGantt/(Test|docs|tools)/"; then
             echo "::error::development files leaked into the archive"
             exit 1
           fi
+
           echo "Archive looks good: $(du -h "$zip" | cut -f1)"
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
+
+          if gh release view "${TAG}" > /dev/null 2>&1; then
+            echo "::error::a release for ${TAG} already exists"
+            exit 1
+          fi
+
           frappe_version="$(sed -n 's/^FRAPPE_GANTT_VERSION=//p' Assets/vendor/VERSION)"
 
           cat > notes.md <<EOF
@@ -79,8 +132,8 @@ jobs:
 
           ## Install
 
-          Download \`FrappeGantt-${GITHUB_REF_NAME}.zip\` and unpack it into your
-          Kanboard \`plugins\` directory, so that \`Plugin.php\` ends up at
+          Download \`FrappeGantt-${TAG}.zip\` and unpack it into your Kanboard
+          \`plugins\` directory, so that \`Plugin.php\` ends up at
           \`plugins/FrappeGantt/Plugin.php\`. The directory **must** be named
           \`FrappeGantt\` — Kanboard derives the plugin's namespace from it.
 
@@ -97,8 +150,7 @@ jobs:
           for configuration and the full feature list.
           EOF
 
-          gh release create "${GITHUB_REF_NAME}" \
-            "FrappeGantt-${GITHUB_REF_NAME}.zip" \
-            --title "v${version}" \
+          gh release create "${TAG}" "FrappeGantt-${TAG}.zip" \
+            --title "v${VERSION}" \
             --notes-file notes.md \
             --verify-tag

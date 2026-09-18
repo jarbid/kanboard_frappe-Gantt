@@ -149,17 +149,26 @@ work on it. Place it at `plugins/FrappeGantt` inside a Kanboard checkout.
 
 ### Cutting a release
 
-Pushing a `v*` tag builds the plugin archive and publishes it to the releases
-page, which is where the install instructions point people:
+The **Release** workflow builds the plugin archive and publishes it to the
+releases page, which is where the install instructions point people. Run it
+either way:
 
-```bash
-git tag -a v1.2.3 -m "v1.2.3"
-git push origin v1.2.3
-```
+- Run the workflow manually from the Actions tab. It reads the version from
+  `getPluginVersion()` in `Plugin.php` and creates the matching tag itself, so
+  bumping that one value is all a release takes.
+- Or push the tag yourself:
 
-The workflow refuses the tag if it disagrees with `getPluginVersion()` in
-`Plugin.php`, and checks the archive unpacks to `FrappeGantt/Plugin.php` with
-no development files in it. `.gitattributes` keeps tests, docs and tooling out
+  ```bash
+  git tag -a v1.2.3 -m "v1.2.3"
+  git push origin v1.2.3
+  ```
+
+  Pushed this way the workflow refuses the tag if it disagrees with
+  `getPluginVersion()`.
+
+Either route checks that the archive unpacks to `FrappeGantt/Plugin.php` with
+the bundled library and every database schema present, and that no development
+files are in it. It refuses to overwrite an existing tag or release. `.gitattributes` keeps tests, docs and tooling out
 of the build, so the archive holds only what a Kanboard installation loads.
 
 To build the same archive locally:
