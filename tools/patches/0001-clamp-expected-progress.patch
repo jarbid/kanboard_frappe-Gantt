@@ -1,0 +1,17 @@
+diff --git a/src/bar.js b/src/bar.js
+index 0cfde18..720cf76 100644
+--- a/src/bar.js
++++ b/src/bar.js
+@@ -582,6 +582,12 @@ export default class Bar {
+                 : this.duration) *
+                 100) /
+             this.duration;
++        // A task that has not started yet has no expected progress. Without
++        // this clamp the value goes negative, which makes the expected
++        // progress rect get a negative width and the browser reject it.
++        if (!(this.expected_progress > 0)) {
++            this.expected_progress = 0;
++        }
+     }
+ 
+     compute_x() {

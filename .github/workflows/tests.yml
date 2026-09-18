@@ -1,0 +1,75 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  tests:
+    name: Unit tests (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    container: kanboard/tests:latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres, mysql]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mariadb:
+        image: mariadb:11
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Kanboard
+        uses: actions/checkout@v4
+        with:
+          repository: kanboard/kanboard
+
+      - name: Checkout the plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugins/FrappeGantt
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run the test suite
+        run: ./vendor/bin/phpunit -c tests/units.${{ matrix.database }}.xml plugins/FrappeGantt/Test/
+        env:
+          DB_HOSTNAME: ${{ matrix.database == 'postgres' && 'postgres' || 'mariadb' }}
+          DB_USERNAME: ${{ matrix.database == 'postgres' && 'postgres' || 'root' }}
+          DB_PASSWORD: ${{ matrix.database == 'postgres' && 'postgres' || 'secret' }}
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check PHP syntax
+        run: |
+          set -e
+          find . -name '*.php' -not -path './.git/*' -print0 \
+            | xargs -0 -n1 php -l > /dev/null
+
+      - name: Check JavaScript syntax
+        run: node --check Assets/kanboard-gantt.js

@@ -1,0 +1,133 @@
+/*
+ * Kanboard theme bridge for Frappe Gantt.
+ *
+ * Kanboard ships one stylesheet per theme (light, dark or auto) and each of
+ * them defines the same set of CSS custom properties on :root. Mapping the
+ * library's own --g-* variables onto those makes the chart follow whichever
+ * theme the user picked, including the "auto" theme's prefers-color-scheme
+ * switch, without this plugin having to detect the theme itself.
+ *
+ * This file is loaded after frappe-gantt.css so these definitions win.
+ */
+
+:root {
+    --g-arrow-color: var(--color-light, #1f2937);
+    --g-bar-color: var(--body-background-color, #fff);
+    --g-bar-border: var(--color-lighter, #fff);
+    --g-tick-color-thick: var(--color-lighter, #ededed);
+    --g-tick-color: var(--border-color, #f3f3f3);
+    --g-actions-background: var(--header-background-color, #f3f3f3);
+    --g-border-color: var(--color-lighter, #ebeff2);
+    --g-text-muted: var(--color-light, #7c7c7c);
+    --g-text-dark: var(--color-primary, #171717);
+    --g-progress-color: var(--color-lighter, #dbdbdb);
+    --g-handle-color: var(--color-medium, #37352f);
+    --g-header-background: var(--header-background-color, #fff);
+    --g-row-color: var(--body-background-color, #fdfdfd);
+    --g-row-border-color: var(--color-lighter, #c7c7c7);
+    --g-today-highlight: var(--link-color-primary, #37352f);
+    --g-popup-actions: var(--header-background-color, #ebeff2);
+}
+
+/* ------------------------------------------------------------- containers */
+
+.kb-gantt-chart {
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.kb-gantt-chart .gantt-container {
+    border: 1px solid var(--color-lighter, #ebeff2);
+    border-radius: 4px;
+}
+
+/* --------------------------------------------------------------- bar types */
+
+/* Tasks whose start or due date is still unset are drawn as an outline so
+   they read as a placeholder rather than a real schedule. */
+.kb-gantt-chart .bar-wrapper.kb-gantt-undated .bar {
+    fill-opacity: 0.25;
+    stroke: var(--color-light, #999);
+    stroke-width: 1px;
+    stroke-dasharray: 4 3;
+}
+
+.kb-gantt-chart .bar-wrapper.kb-gantt-closed .bar-label {
+    text-decoration: line-through;
+}
+
+.kb-gantt-chart .bar-wrapper.kb-gantt-closed {
+    opacity: 0.65;
+}
+
+.kb-gantt-chart .bar-wrapper.kb-gantt-subtask .bar {
+    fill-opacity: 0.55;
+}
+
+.kb-gantt-chart .bar-wrapper.kb-gantt-subtask .bar-label {
+    font-style: italic;
+}
+
+/* Subtasks and read-only charts must not advertise drag handles. */
+.kb-gantt-chart .bar-wrapper.kb-gantt-subtask .handle {
+    display: none;
+}
+
+.kb-gantt-chart .bar-wrapper.kb-gantt-milestone .bar {
+    stroke: var(--color-primary, #333);
+    stroke-width: 2px;
+}
+
+/* ------------------------------------------------------------------ popup */
+
+.kb-gantt-chart .popup-wrapper .title {
+    font-weight: bold;
+}
+
+.kb-gantt-chart .popup-wrapper .details {
+    line-height: 1.5;
+}
+
+/* ------------------------------------------------------------------ toast */
+
+.kb-gantt-toast {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 100;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--alert-color-success, #468847);
+    background-color: var(--alert-background-color-success, #dff0d8);
+    border: 1px solid var(--alert-border-color-success, #d6e9c6);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.kb-gantt-toast.kb-gantt-toast-visible {
+    opacity: 1;
+}
+
+.kb-gantt-toast.kb-gantt-toast-error {
+    color: var(--alert-color-error, #b94a48);
+    background-color: var(--alert-background-color-error, #f2dede);
+    border-color: var(--alert-border-color-error, #eed3d7);
+}
+
+/* --------------------------------------------------------------- settings */
+
+.kb-gantt-settings-group {
+    margin-bottom: 20px;
+}
+
+.kb-gantt-settings-group .form-inline-group {
+    display: inline-block;
+    margin-right: 20px;
+}
+
+.kb-gantt-vendor-version {
+    color: var(--color-light, #999);
+    font-size: 0.9em;
+}
