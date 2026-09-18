@@ -68,20 +68,20 @@ jobs:
 
       - name: Build the archive
         env:
-          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           # The export-ignore rules in .gitattributes keep this to the files a
           # Kanboard installation actually loads.
-          git archive HEAD --prefix=FrappeGantt/ --format=zip -o "FrappeGantt-${TAG}.zip"
-          unzip -l "FrappeGantt-${TAG}.zip"
+          git archive HEAD --prefix=FrappeGantt/ --format=zip -o "FrappeGantt-${VERSION}.zip"
+          unzip -l "FrappeGantt-${VERSION}.zip"
 
       - name: Sanity-check the archive
         env:
-          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          zip="FrappeGantt-${TAG}.zip"
+          zip="FrappeGantt-${VERSION}.zip"
 
           # Kanboard derives the plugin namespace from the directory name, so
           # this has to unpack to exactly plugins/FrappeGantt/Plugin.php.
@@ -132,7 +132,7 @@ jobs:
 
           ## Install
 
-          Download \`FrappeGantt-${TAG}.zip\` and unpack it into your Kanboard
+          Download \`FrappeGantt-${VERSION}.zip\` and unpack it into your Kanboard
           \`plugins\` directory, so that \`Plugin.php\` ends up at
           \`plugins/FrappeGantt/Plugin.php\`. The directory **must** be named
           \`FrappeGantt\` — Kanboard derives the plugin's namespace from it.
@@ -150,7 +150,7 @@ jobs:
           for configuration and the full feature list.
           EOF
 
-          gh release create "${TAG}" "FrappeGantt-${TAG}.zip" \
+          gh release create "${TAG}" "FrappeGantt-${VERSION}.zip" \
             --title "v${VERSION}" \
             --notes-file notes.md \
             --verify-tag

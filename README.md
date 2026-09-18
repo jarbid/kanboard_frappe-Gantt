@@ -177,6 +177,20 @@ To build the same archive locally:
 make archive
 ```
 
+The archive is named `FrappeGantt-<version>.zip` and unpacks to a single
+`FrappeGantt/` directory, which is what the Kanboard plugin directory requires
+of a `download` URL — a GitHub source archive will not do, because GitHub
+appends the branch name to the folder and Kanboard then cannot load the
+plugin.
+
+### Listing on the Kanboard plugin directory
+
+The directory is the `plugins.json` file in
+[kanboard/website](https://github.com/kanboard/website). Adding the plugin
+means opening a pull request there that inserts an entry, in alphabetical
+order, pointing `download` at a release asset. `scripts/validate-plugins.py`
+in that repository checks the ordering and the schema.
+
 ### Updating the bundled library
 
 `Assets/vendor` holds a pre-built copy of Frappe Gantt so that installations
