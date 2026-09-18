@@ -147,6 +147,27 @@ work on it. Place it at `plugins/FrappeGantt` inside a Kanboard checkout.
 ./vendor/bin/phpunit -c tests/units.mysql.xml    plugins/FrappeGantt/Test/
 ```
 
+### Cutting a release
+
+Pushing a `v*` tag builds the plugin archive and publishes it to the releases
+page, which is where the install instructions point people:
+
+```bash
+git tag -a v1.2.3 -m "v1.2.3"
+git push origin v1.2.3
+```
+
+The workflow refuses the tag if it disagrees with `getPluginVersion()` in
+`Plugin.php`, and checks the archive unpacks to `FrappeGantt/Plugin.php` with
+no development files in it. `.gitattributes` keeps tests, docs and tooling out
+of the build, so the archive holds only what a Kanboard installation loads.
+
+To build the same archive locally:
+
+```bash
+make archive
+```
+
 ### Updating the bundled library
 
 `Assets/vendor` holds a pre-built copy of Frappe Gantt so that installations

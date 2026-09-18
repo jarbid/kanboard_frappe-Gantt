@@ -1,0 +1,104 @@
+name: Release
+
+# Pushing a v* tag publishes the installable plugin archive to the releases
+# page, which is where the README tells people to get it.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish the plugin archive
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check the plugin version matches the tag
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          declared="$(grep -A2 'function getPluginVersion' Plugin.php | grep -oP "return '\K[^']+")"
+          echo "tag=${tag} declared=${declared}"
+          if [ "${tag}" != "${declared}" ]; then
+            echo "::error::Plugin.php declares ${declared} but the tag is ${tag}"
+            exit 1
+          fi
+
+      - name: Build the archive
+        run: |
+          set -euo pipefail
+          # export-ignore rules in .gitattributes keep this to the files a
+          # Kanboard installation actually loads.
+          git archive HEAD --prefix=FrappeGantt/ --format=zip \
+            -o "FrappeGantt-${GITHUB_REF_NAME}.zip"
+          unzip -l "FrappeGantt-${GITHUB_REF_NAME}.zip"
+
+      - name: Sanity-check the archive
+        run: |
+          set -euo pipefail
+          zip="FrappeGantt-${GITHUB_REF_NAME}.zip"
+          # Kanboard derives the plugin namespace from the directory name, so
+          # Plugin.php has to unpack to exactly plugins/FrappeGantt/Plugin.php.
+          for required in \
+            FrappeGantt/Plugin.php \
+            FrappeGantt/Assets/vendor/frappe-gantt.umd.js \
+            FrappeGantt/Assets/kanboard-gantt.js \
+            FrappeGantt/Schema/Sqlite.php \
+            FrappeGantt/Schema/Mysql.php \
+            FrappeGantt/Schema/Postgres.php \
+            FrappeGantt/Schema/Mssql.php \
+            FrappeGantt/Template/gantt/chart.php
+          do
+            unzip -l "$zip" | grep -q " ${required}$" \
+              || { echo "::error::${required} is missing from the archive"; exit 1; }
+          done
+          # Development-only files must not ship.
+          if unzip -l "$zip" | grep -qE " FrappeGantt/(Test|docs|tools)/"; then
+            echo "::error::development files leaked into the archive"
+            exit 1
+          fi
+          echo "Archive looks good: $(du -h "$zip" | cut -f1)"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          frappe_version="$(sed -n 's/^FRAPPE_GANTT_VERSION=//p' Assets/vendor/VERSION)"
+
+          cat > notes.md <<EOF
+          Kanboard plugin rendering projects, tasks and subtasks with
+          [Frappe Gantt](https://github.com/frappe/gantt) ${frappe_version}.
+
+          ## Install
+
+          Download \`FrappeGantt-${GITHUB_REF_NAME}.zip\` and unpack it into your
+          Kanboard \`plugins\` directory, so that \`Plugin.php\` ends up at
+          \`plugins/FrappeGantt/Plugin.php\`. The directory **must** be named
+          \`FrappeGantt\` — Kanboard derives the plugin's namespace from it.
+
+          The database table the plugin needs is created on the next request.
+          No build step is required: the library is bundled pre-built.
+
+          ## Requirements
+
+          - Kanboard >= 1.2.20, PHP >= 8.1
+          - Any database Kanboard supports: SQLite, MySQL/MariaDB, PostgreSQL
+            and SQL Server
+
+          See the [README](https://github.com/${GITHUB_REPOSITORY}/blob/main/README.md)
+          for configuration and the full feature list.
+          EOF
+
+          gh release create "${GITHUB_REF_NAME}" \
+            "FrappeGantt-${GITHUB_REF_NAME}.zip" \
+            --title "v${version}" \
+            --notes-file notes.md \
+            --verify-tag
