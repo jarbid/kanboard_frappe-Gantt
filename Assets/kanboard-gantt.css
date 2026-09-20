@@ -314,3 +314,21 @@ body.kb-gantt-resizing {
     border-color: var(--color-primary, #3876d3);
     color: var(--color-primary, #3876d3);
 }
+
+/* ------------------------------------------------------ critical path -- */
+
+/* The chain that decides when the plan finishes. Outlined rather than
+   recoloured, so the task's own colour still reads. */
+.kb-gantt-chart .bar-wrapper.kb-gantt-critical .bar {
+    stroke: var(--color-red-border, #b94a48);
+    stroke-width: 2px;
+}
+
+.kb-gantt-chart .bar-wrapper.kb-gantt-critical .kb-gantt-diamond {
+    stroke: var(--color-red-border, #b94a48);
+    stroke-width: 2px;
+}
+
+.kb-gantt-chart .kb-gantt-side-row.kb-gantt-critical-row .kb-gantt-side-title {
+    font-weight: bold;
+}

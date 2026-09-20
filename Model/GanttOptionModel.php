@@ -133,6 +133,7 @@ class GanttOptionModel extends Base
                 'group' => 'data',
             ),
             'show_subtasks' => array('type' => 'bool', 'default' => false, 'scope' => 'plugin', 'group' => 'data'),
+            'show_critical_path' => array('type' => 'bool', 'default' => false, 'scope' => 'plugin', 'group' => 'data'),
             'show_closed_tasks' => array('type' => 'bool', 'default' => false, 'scope' => 'plugin', 'group' => 'data'),
             'dependency_links' => array(
                 'type' => 'set',

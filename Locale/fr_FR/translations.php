@@ -105,6 +105,7 @@ return array(
     'Task order' => 'Ordre des tâches',
     'Board position' => 'Position sur le tableau',
     'Show subtasks as child rows' => 'Afficher les sous-tâches comme lignes enfants',
+    'Highlight the critical path' => 'Mettre en évidence le chemin critique',
     'Include closed tasks' => 'Inclure les tâches fermées',
     'Link types drawn as dependencies' => 'Types de lien représentés comme dépendances',
     'Open the task on' => 'Ouvrir la tâche au',

@@ -444,6 +444,10 @@
             name.classList.add('kb-gantt-side-subtask');
         }
 
+        if ((kb.classes || []).indexOf('kb-gantt-critical') !== -1) {
+            row.classList.add('kb-gantt-critical-row');
+        }
+
         if (kb.type === 'task' && kb.task_id) {
             var id = document.createElement('span');
             id.className = 'kb-gantt-side-id';

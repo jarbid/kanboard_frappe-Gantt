@@ -56,6 +56,7 @@ $labels = array(
     'show_expected_progress' => t('Show expected progress'),
     'task_sort' => t('Task order'),
     'show_subtasks' => t('Show subtasks as child rows'),
+    'show_critical_path' => t('Highlight the critical path'),
     'show_closed_tasks' => t('Include closed tasks'),
     'dependency_links' => t('Link types drawn as dependencies'),
     'open_task_on' => t('Open the task on'),

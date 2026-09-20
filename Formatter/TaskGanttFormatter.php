@@ -8,6 +8,7 @@ use Kanboard\Model\LinkModel;
 use Kanboard\Model\SubtaskModel;
 use Kanboard\Model\TaskLinkModel;
 use Kanboard\Model\TaskModel;
+use Kanboard\Plugin\FrappeGantt\Model\GanttCriticalPathModel;
 
 /**
  * Turn Kanboard tasks into Frappe Gantt bar definitions.
@@ -73,13 +74,21 @@ class TaskGanttFormatter extends BaseFormatter implements FormatterInterface
         $stored_progress = $this->ganttProgressModel->getMultiple($task_ids);
         $dependencies = $this->getDependencies($task_ids);
         $subtasks = empty($this->options['show_subtasks']) ? array() : $this->getSubtasks($task_ids);
+        $critical = empty($this->options['show_critical_path'])
+            ? array()
+            : $this->getCriticalPath($tasks, $dependencies);
 
         $bars = array();
 
         foreach ($tasks as $task) {
             $id = (int) $task['id'];
             $stored = isset($stored_progress[$id]) ? $stored_progress[$id] : null;
-            $bar = $this->formatTask($task, $stored, isset($dependencies[$id]) ? $dependencies[$id] : array());
+            $bar = $this->formatTask(
+                $task,
+                $stored,
+                isset($dependencies[$id]) ? $dependencies[$id] : array(),
+                isset($critical[$id])
+            );
             $bars[] = $bar;
 
             if (isset($subtasks[$id])) {
@@ -98,7 +107,7 @@ class TaskGanttFormatter extends BaseFormatter implements FormatterInterface
      * @param  array $dependencies
      * @return array
      */
-    private function formatTask(array $task, $stored_progress, array $dependencies)
+    private function formatTask(array $task, $stored_progress, array $dependencies, $is_critical = false)
     {
         $project_id = (int) $task['project_id'];
 
@@ -149,6 +158,10 @@ class TaskGanttFormatter extends BaseFormatter implements FormatterInterface
 
         if (! empty($task['is_milestone'])) {
             $classes[] = 'kb-gantt-milestone';
+        }
+
+        if ($is_critical) {
+            $classes[] = 'kb-gantt-critical';
         }
 
         return array(
@@ -342,6 +355,46 @@ class TaskGanttFormatter extends BaseFormatter implements FormatterInterface
             'background' => $properties['background'],
             'border' => $properties['border'],
         );
+    }
+
+    /**
+     * Tasks on the critical path, keyed by id.
+     *
+     * Only tasks with both dates take part: a task with no duration cannot
+     * lengthen a chain, and guessing one would put tasks on the path that do
+     * not belong there.
+     *
+     * @param  array $tasks
+     * @param  array $dependencies
+     * @return array
+     */
+    private function getCriticalPath(array $tasks, array $dependencies)
+    {
+        $nodes = array();
+
+        foreach ($tasks as $task) {
+            if (empty($task['date_started']) || empty($task['date_due'])) {
+                continue;
+            }
+
+            $id = (int) $task['id'];
+            $duration = ((int) $task['date_due'] - (int) $task['date_started']) / 86400;
+
+            $predecessors = array();
+
+            if (isset($dependencies[$id])) {
+                foreach ($dependencies[$id] as $bar_id) {
+                    $predecessors[] = (int) substr($bar_id, strlen('task-'));
+                }
+            }
+
+            $nodes[$id] = array(
+                'duration' => max(0, $duration),
+                'predecessors' => $predecessors,
+            );
+        }
+
+        return array_flip(GanttCriticalPathModel::compute($nodes));
     }
 
     /**
