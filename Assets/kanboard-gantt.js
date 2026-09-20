@@ -746,6 +746,264 @@
         return paint;
     }
 
+    /* -------------------------------------------------------- zoom controls */
+
+    /* View modes from finest to coarsest, with the days each column covers.
+       The library orders its own list by preference, not granularity, so
+       zooming needs its own order. */
+    var ZOOM_ORDER = ['Hour', 'Quarter Day', 'Half Day', 'Day', 'Week', 'Month', 'Year'];
+    var STEP_DAYS = {
+        'Hour': 1 / 24,
+        'Quarter Day': 0.25,
+        'Half Day': 0.5,
+        'Day': 1,
+        'Week': 7,
+        'Month': 30,
+        'Year': 365
+    };
+
+    /**
+     * Enabled view modes, finest first.
+     */
+    function zoomableModes(chart) {
+        return (chart.options.view_modes || [])
+            .slice()
+            .filter(function (mode) {
+                return ZOOM_ORDER.indexOf(mode.name) !== -1;
+            })
+            .sort(function (a, b) {
+                return ZOOM_ORDER.indexOf(a.name) - ZOOM_ORDER.indexOf(b.name);
+            });
+    }
+
+    /**
+     * The window the chart has to cover: its earliest start, its latest end,
+     * and the number of days between them.
+     */
+    function taskWindow(tasks) {
+        var min = null;
+        var max = null;
+
+        tasks.forEach(function (task) {
+            var start = new Date(task.start);
+            var end = new Date(task.end);
+
+            if (isNaN(start) || isNaN(end)) {
+                return;
+            }
+
+            if (min === null || start < min) { min = start; }
+            if (max === null || end > max) { max = end; }
+        });
+
+        if (min === null) {
+            return null;
+        }
+
+        return { start: min, end: max, days: Math.max(1, (max - min) / 86400000) };
+    }
+
+    /**
+     * Step one view mode finer or coarser.
+     */
+    function stepZoom(chart, direction, onChange) {
+        var modes = zoomableModes(chart);
+        var current = modes.findIndex(function (mode) {
+            return mode.name === chart.config.view_mode.name;
+        });
+
+        if (current === -1) {
+            return;
+        }
+
+        var next = modes[current + direction];
+
+        if (!next) {
+            return;
+        }
+
+        chart.change_view_mode(next.name, true);
+        onChange(next.name);
+    }
+
+    /**
+     * Pick the finest view mode whose full span still fits the chart.
+     */
+    function fitZoom(chart, tasks, onChange) {
+        var modes = zoomableModes(chart);
+        var window_ = taskWindow(tasks);
+        var available = chart.$container.clientWidth;
+
+        if (!window_ || !available) {
+            return;
+        }
+
+        for (var i = 0; i < modes.length; i++) {
+            var mode = modes[i];
+            var columnWidth = mode.column_width || chart.options.column_width || 45;
+            var width = (window_.days / STEP_DAYS[mode.name]) * columnWidth;
+
+            if (width <= available || i === modes.length - 1) {
+                chart.change_view_mode(mode.name, true);
+                onChange(mode.name);
+
+                // Choosing the mode is only half of it: the chart is still
+                // looking wherever it was, which after a zoom is rarely the
+                // plan. Put the earliest task at the left edge.
+                scrollToWindowStart(chart, window_);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Scroll so the plan starts at the left edge, a little before the first
+     * task so its bar is not flush against the frame.
+     */
+    function scrollToWindowStart(chart, window_) {
+        var start = new Date(window_.start.getTime() - 86400000);
+        var iso = start.getFullYear() + '-' +
+            ('0' + (start.getMonth() + 1)).slice(-2) + '-' +
+            ('0' + start.getDate()).slice(-2);
+
+        // The chart re-renders on a view mode change, so the scroll is set
+        // once that has settled.
+        window.setTimeout(function () {
+            try {
+                chart.set_scroll_position(iso);
+            } catch (e) {
+                chart.set_scroll_position('start');
+            }
+        }, 0);
+    }
+
+    /**
+     * Add zoom buttons beside the library's own header controls.
+     */
+    function buildZoomControls(chart, container, config, storageKey) {
+        var labels = (config.bridge || {}).labels || {};
+
+        if (zoomableModes(chart).length < 2) {
+            return;
+        }
+
+        function remember(name) {
+            writeStorage(storageKey, name);
+            syncViewModeSelect(container, name);
+        }
+
+        /**
+         * Changing the view mode re-renders the chart, which rebuilds the
+         * header these buttons live in, so they are put back after every
+         * render rather than only once.
+         */
+        function inject() {
+            var header = container.querySelector('.side-header');
+
+            if (!header || header.querySelector('.kb-gantt-zoom')) {
+                return;
+            }
+
+            function button(text, title, handler) {
+                var el = document.createElement('button');
+
+                el.type = 'button';
+                el.className = 'kb-gantt-zoom';
+                el.textContent = text;
+                el.title = title;
+                el.addEventListener('click', handler);
+                header.prepend(el);
+            }
+
+            // Prepended, so these are added in reverse of their visual order.
+            button('\u29C9', labels.zoom_fit || 'Fit', function () {
+                fitZoom(chart, config.tasks, remember);
+            });
+            button('+', labels.zoom_in || 'Zoom in', function () {
+                stepZoom(chart, -1, remember);
+            });
+            button('\u2212', labels.zoom_out || 'Zoom out', function () {
+                stepZoom(chart, 1, remember);
+            });
+        }
+
+        var render = chart.render.bind(chart);
+
+        chart.render = function () {
+            render();
+            inject();
+        };
+
+        inject();
+    }
+
+    /**
+     * Keep the library's own mode dropdown in step when we change the mode
+     * for it.
+     */
+    function syncViewModeSelect(container, name) {
+        var select = container.querySelector('.viewmode-select');
+
+        if (select) {
+            select.value = name;
+        }
+    }
+
+    /* ---------------------------------------------------------- milestones */
+
+    /**
+     * Draw milestones as diamonds.
+     *
+     * Kanboard marks a task as a milestone when it is linked with "is a
+     * milestone of". A milestone is a point in time rather than a span, and
+     * every Gantt convention draws it as a diamond, so the bar is replaced
+     * with one sitting on the task's start date.
+     */
+    function decorateMilestones(container, tasks) {
+        tasks.forEach(function (task) {
+            var classes = (task.kb && task.kb.classes) || [];
+
+            if (classes.indexOf('kb-gantt-milestone') === -1) {
+                return;
+            }
+
+            var wrapper = container.querySelector(
+                '.bar-wrapper[data-id="' + String(task.id).replace(/"/g, '\\"') + '"]'
+            );
+
+            if (!wrapper || wrapper.querySelector('.kb-gantt-diamond')) {
+                return;
+            }
+
+            var bar = wrapper.querySelector('.bar');
+
+            if (!bar) {
+                return;
+            }
+
+            var x = parseFloat(bar.getAttribute('x'));
+            var y = parseFloat(bar.getAttribute('y'));
+            var height = parseFloat(bar.getAttribute('height'));
+            var side = height * 0.62;
+            var cx = x;
+            var cy = y + height / 2;
+
+            var diamond = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            diamond.setAttribute('class', 'kb-gantt-diamond');
+            diamond.setAttribute('x', cx - side / 2);
+            diamond.setAttribute('y', cy - side / 2);
+            diamond.setAttribute('width', side);
+            diamond.setAttribute('height', side);
+            diamond.setAttribute('transform', 'rotate(45 ' + cx + ' ' + cy + ')');
+
+            if (bar.style.fill) {
+                diamond.style.fill = bar.style.fill;
+            }
+
+            bar.parentNode.appendChild(diamond);
+        });
+    }
+
     /* ------------------------------------------------------- state classes */
 
     /**
@@ -808,6 +1066,7 @@
         chart.render = function () {
             render();
             applyStateClasses(container, tasks);
+            decorateMilestones(container, tasks);
         };
 
         var updateTask = chart.update_task.bind(chart);
@@ -815,10 +1074,12 @@
         chart.update_task = function (id, details) {
             var result = updateTask(id, details);
             applyStateClasses(container, tasks);
+            decorateMilestones(container, tasks);
             return result;
         };
 
         applyStateClasses(container, tasks);
+        decorateMilestones(container, tasks);
     }
 
     /* ----------------------------------------------------------------- init */
@@ -863,6 +1124,16 @@
             container._gantt = chart;
             keepStateClasses(chart, container, config.tasks);
             buildSidebar(container, chart, config, container.getAttribute('data-gantt-scope') || 'default');
+            buildZoomControls(chart, container, config, storageKey);
+
+            // "fit" is ours, not the library's: frame the whole plan instead
+            // of a fixed point in time.
+            if (config.bridge && config.bridge.scroll_to_fit) {
+                fitZoom(chart, config.tasks, function (name) {
+                    syncViewModeSelect(container, name);
+                });
+                chart.set_scroll_position('start');
+            }
         } catch (e) {
             window.console && console.error('Frappe Gantt: unable to render the chart', e);
         }

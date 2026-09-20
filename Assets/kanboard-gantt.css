@@ -272,3 +272,45 @@ body.kb-gantt-resizing {
 .kb-gantt-chart .bar-wrapper.kb-gantt-hover .bar {
     filter: brightness(0.92);
 }
+
+/* ---------------------------------------------------------- milestones -- */
+
+/* A milestone is a point in time, so the span is hidden and a diamond sits
+   on its start date instead. */
+.kb-gantt-chart .bar-wrapper.kb-gantt-milestone .bar,
+.kb-gantt-chart .bar-wrapper.kb-gantt-milestone .bar-progress,
+.kb-gantt-chart .bar-wrapper.kb-gantt-milestone .handle {
+    display: none;
+}
+
+.kb-gantt-chart .kb-gantt-diamond {
+    fill: var(--color-purple-border, #8e44ad);
+    stroke: var(--body-background-color, #fff);
+    stroke-width: 1px;
+}
+
+.kb-gantt-chart .bar-wrapper.kb-gantt-milestone .bar-label {
+    fill: var(--font-color, #333);
+    text-anchor: start;
+}
+
+/* -------------------------------------------------------- zoom buttons -- */
+
+.kb-gantt-chart .kb-gantt-zoom {
+    min-width: 26px;
+    height: 24px;
+    margin-right: 4px;
+    padding: 0 6px;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 3px;
+    background: var(--body-background-color, #fff);
+    color: var(--font-color, #333);
+    font-size: 0.9em;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.kb-gantt-chart .kb-gantt-zoom:hover {
+    border-color: var(--color-primary, #3876d3);
+    color: var(--color-primary, #3876d3);
+}

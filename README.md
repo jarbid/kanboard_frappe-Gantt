@@ -10,6 +10,9 @@ library's complete feature set through Kanboard's settings and permissions.
 
 - **Three charts** — one per project, one across every project you can see, and
   one for the tasks assigned to you.
+- **A task column beside the chart** — task ids and links that stay put while
+  the timeline scrolls, with a dropdown for which extra fields to show and a
+  draggable divider.
 - **Editable in place** — drag a bar to change a task's start and due date,
   drag the progress handle to set its completion percentage. Everything is
   written straight back to Kanboard.
@@ -17,6 +20,9 @@ library's complete feature set through Kanboard's settings and permissions.
   reflects relationships you already maintain.
 - **Every upstream option** — all of Frappe Gantt's options are configurable,
   globally and per project.
+- **Milestones as diamonds** — tasks linked with "is a milestone of" are drawn
+  the way every Gantt draws a milestone.
+- **Zoom** — step through the view modes, or fit the whole plan to the window.
 - **Follows your theme** — light, dark and auto all work, and bars take their
   colour from the task or its category.
 
@@ -53,7 +59,7 @@ Once installed the plugin adds:
 
 | Where | What |
 | ----- | ---- |
-| Project view switcher | **Gantt** — the chart for that project |
+| Project view switcher | **Gantt** — the chart for that project (keyboard: `v` then `g`) |
 | Project list menu | **Gantt chart for all projects** |
 | Dashboard sidebar | **My Gantt chart** |
 | Settings sidebar | **Gantt settings** — the global configuration |
@@ -72,6 +78,7 @@ project.
 | Progress | the plugin's own percentage, falling back to the task's board column position, and always 100% for a closed task |
 | Dependency arrow | task links whose label is enabled in the settings |
 | Bar colour | the task's colour, or its category's |
+| Milestone diamond | a task linked with "is a milestone of" |
 | Child rows | the task's subtasks, when enabled |
 
 Kanboard has no percent-complete field, so dragging the progress handle stores
@@ -100,13 +107,25 @@ settings**, and any project can override the whole set under its own
 `bar_height`, `bar_corner_radius`, `arrow_curve`, `padding`, `column_width`,
 `upper_header_height`, `lower_header_height`, `container_height`, `lines`.
 
+The task column is configured here too: whether it is shown
+(`left_column`), how wide it starts (`left_column_width`) and which extra
+fields it carries (`left_column_fields` — assignee, start, due, progress,
+category, swimlane, column). The task id and its title are always shown.
+Each user's own width and field choices are remembered in their browser, so
+these settings are the starting point rather than a constraint.
+
 ### Timeline
 
 `view_mode`, `view_mode_select`, `today_button`, `infinite_padding`,
 `scroll_to`, `date_format`, `snap_at`, plus which of the seven view modes
 (Hour, Quarter Day, Half Day, Day, Week, Month, Year) are offered.
 
-The view mode a user picks is remembered per chart in their browser.
+`scroll_to` takes `today` (the default), `start`, `end`, a date, or `fit` to
+frame the whole plan on load.
+
+The view mode a user picks is remembered per chart in their browser. The
+zoom buttons step through the enabled modes, and the fit button picks the
+finest mode that still shows the whole plan.
 
 ### Weekends and holidays
 

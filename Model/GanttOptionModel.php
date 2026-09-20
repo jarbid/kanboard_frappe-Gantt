@@ -370,6 +370,13 @@ class GanttOptionModel extends Base
             $options['container_height'] = (int) $options['container_height'];
         }
 
+        // "fit" is the plugin's own value: the bridge frames the whole plan
+        // once the chart exists. The library has never heard of it and would
+        // try to parse it as a date, so it is given a value it understands.
+        if ($options['scroll_to'] === 'fit') {
+            $options['scroll_to'] = 'start';
+        }
+
         if (! $editable) {
             $options['readonly'] = true;
         }
@@ -398,6 +405,7 @@ class GanttOptionModel extends Base
             'ignore_dates' => array_column($this->parseDateList($values['ignore_dates']), 'date'),
             'enabled_view_modes' => $values['enabled_view_modes'],
             'open_task_on' => $values['open_task_on'],
+            'scroll_to_fit' => $values['scroll_to'] === 'fit',
             'left_column' => $values['left_column'],
             'left_column_width' => $values['left_column_width'],
             'left_column_fields' => array_values($values['left_column_fields']),

@@ -81,6 +81,10 @@ class Plugin extends Base
     {
         $this->hook->on('template:layout:css', array('template' => 'plugins/FrappeGantt/Assets/vendor/frappe-gantt.css'));
         $this->hook->on('template:layout:css', array('template' => 'plugins/FrappeGantt/Assets/kanboard-gantt.css'));
+
+        // Loaded everywhere, not just on the chart: the shortcut exists to
+        // reach the Gantt view from the board or the list.
+        $this->hook->on('template:layout:js', array('template' => 'plugins/FrappeGantt/Assets/kanboard-shortcut.js'));
     }
 
     public function getPluginName()

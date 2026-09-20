@@ -55,6 +55,9 @@ return array(
     'Chart height ("auto" or a number of pixels)' => 'Hauteur du diagramme (« auto » ou un nombre de pixels)',
     'Grid lines' => 'Lignes de la grille',
     'Show the task column beside the chart' => 'Afficher la colonne des tâches à côté du diagramme',
+    'Zoom in' => 'Zoom avant',
+    'Zoom out' => 'Zoom arrière',
+    'Fit the whole plan' => 'Afficher tout le planning',
     'Task column width (pixels)' => 'Largeur de la colonne des tâches (pixels)',
     'Extra fields in the task column' => 'Champs supplémentaires dans la colonne des tâches',
     'Both' => 'Les deux',
@@ -67,7 +70,7 @@ return array(
     'Show the view mode selector' => 'Afficher le sélecteur de mode d\'affichage',
     'Show the "Today" button' => 'Afficher le bouton « Aujourd\'hui »',
     'Extend the timeline while scrolling' => 'Étendre la frise lors du défilement',
-    'Scroll to on load ("today", "start", "end" or a date)' => 'Position au chargement (« today », « start », « end » ou une date)',
+    'Scroll to on load ("today", "fit", "start", "end" or a date)' => 'Position au chargement (« today », « fit », « start », « end » ou une date)',
     'Snap dragging to (for example "1d", empty for the view mode default)' => 'Aligner le déplacement sur (par exemple « 1d », vide pour la valeur par défaut du mode d\'affichage)',
 
     // Settings: weekends and holidays
