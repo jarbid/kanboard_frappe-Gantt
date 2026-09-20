@@ -87,7 +87,21 @@
             if (!response.ok) {
                 throw new Error('HTTP ' + response.status);
             }
-            return response;
+
+            // Kanboard answers a request it cannot route with a plain text
+            // error and a 200, so the status alone does not tell us the save
+            // happened. Every real response from the plugin is JSON.
+            return response.text().then(function (body) {
+                var payload;
+
+                try {
+                    payload = JSON.parse(body);
+                } catch (e) {
+                    throw new Error('Unexpected response: ' + body.slice(0, 120));
+                }
+
+                return payload;
+            });
         });
     }
 
@@ -325,9 +339,14 @@
             dateTimers[task.id] = window.setTimeout(function () {
                 post(endpoints.dates, payload, bridge.csrf_token).then(function () {
                     original[task.id] = { start: payload.start, end: payload.end };
-                    // Both endpoints are now set, so drop the "undated" styling.
+
+                    // The task now has both dates, so it is no longer undated.
+                    // The class has to come off the bar and out of kb.classes,
+                    // otherwise the next re-render puts it straight back.
                     kb.has_start = true;
                     kb.has_due = true;
+                    dropStateClass(container, task, 'kb-gantt-undated');
+
                     notify(container, labels.saved, false);
                 }).catch(function () {
                     self.update_task(task.id, original[task.id]);
@@ -388,6 +407,27 @@
                 });
             }
         });
+    }
+
+    /**
+     * Remove a state modifier from a bar and from the task it came from, so
+     * that re-renders do not restore it.
+     */
+    function dropStateClass(container, task, name) {
+        var classes = (task.kb && task.kb.classes) || [];
+        var index = classes.indexOf(name);
+
+        if (index !== -1) {
+            classes.splice(index, 1);
+        }
+
+        var wrapper = container.querySelector(
+            '.bar-wrapper[data-id="' + String(task.id).replace(/"/g, '\\"') + '"]'
+        );
+
+        if (wrapper) {
+            wrapper.classList.remove(name);
+        }
     }
 
     /**

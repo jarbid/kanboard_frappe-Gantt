@@ -32,7 +32,8 @@ class ProjectGanttController extends BaseGanttController
         $bars = $filter->format(new ProjectGanttFormatter($this->container));
 
         $config = $this->buildChartConfig($bars, $values, $editable, array(
-            'dates' => $this->helper->url->href('ProjectGanttController', 'save', array('plugin' => 'FrappeGantt')),
+            // A plain "&" separator; see the note in TaskGanttController.
+            'dates' => $this->helper->url->to('ProjectGanttController', 'save', array('plugin' => 'FrappeGantt')),
         ));
 
         $this->response->html($this->helper->layout->app('FrappeGantt:project_gantt/show', array(

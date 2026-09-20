@@ -52,12 +52,16 @@ class TaskGanttController extends BaseGanttController
             (new TaskGanttFormatter($this->container))->withOptions($values)
         );
 
+        // url->to() joins parameters with a plain "&". url->href() uses
+        // "&amp;" for embedding straight into markup, which would arrive at
+        // the browser double-escaped once the JSON payload is attribute
+        // escaped, dropping every parameter after the first.
         $config = $this->buildChartConfig($bars, $values, $editable, array(
-            'dates' => $this->helper->url->href('TaskGanttController', 'save', array(
+            'dates' => $this->helper->url->to('TaskGanttController', 'save', array(
                 'project_id' => $project['id'],
                 'plugin' => 'FrappeGantt',
             )),
-            'progress' => $this->helper->url->href('TaskGanttController', 'saveProgress', array(
+            'progress' => $this->helper->url->to('TaskGanttController', 'saveProgress', array(
                 'project_id' => $project['id'],
                 'plugin' => 'FrappeGantt',
             )),
