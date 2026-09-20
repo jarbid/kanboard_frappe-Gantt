@@ -57,7 +57,9 @@ class Plugin extends Base
 
     private function registerAccessMap()
     {
-        $this->projectAccessMap->add('TaskGanttController', array('save', 'saveProgress'), Role::PROJECT_MEMBER);
+        // PROJECT_MEMBER for saveDependency matches Kanboard core, which
+        // gates TaskInternalLinkController and the task link API the same way.
+        $this->projectAccessMap->add('TaskGanttController', array('save', 'saveProgress', 'saveDependency'), Role::PROJECT_MEMBER);
         $this->projectAccessMap->add('ProjectSettingsController', array('show', 'save'), Role::PROJECT_MANAGER);
         $this->applicationAccessMap->add('ProjectGanttController', 'save', Role::APP_MANAGER);
     }

@@ -750,6 +750,213 @@
         return paint;
     }
 
+    /* --------------------------------------------------- dependency editing */
+
+    /**
+     * Right-click menu for creating and removing dependencies.
+     *
+     * A dependency is an ordinary Kanboard task link, so the chart is
+     * reloaded after a change rather than patched: the critical path and the
+     * arrows are both worked out on the server, and re-reading them is more
+     * honest than guessing at the new state here.
+     */
+    function attachDependencyEditing(chart, container, config) {
+        var bridge = config.bridge || {};
+        var labels = bridge.labels || {};
+        var endpoint = (bridge.endpoints || {}).dependency;
+
+        if (!endpoint || !bridge.editable) {
+            return;
+        }
+
+        var menu = document.createElement('div');
+        menu.className = 'kb-gantt-menu';
+        menu.hidden = true;
+        container.appendChild(menu);
+
+        // While a predecessor is being picked, the next click on a bar
+        // completes the link instead of opening the task.
+        var picking = null;
+
+        function closeMenu() {
+            menu.hidden = true;
+            menu.innerHTML = '';
+        }
+
+        function stopPicking() {
+            picking = null;
+            container.classList.remove('kb-gantt-picking');
+            hideBanner();
+        }
+
+        var banner = null;
+
+        function showBanner(text) {
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.className = 'kb-gantt-banner';
+                container.appendChild(banner);
+            }
+
+            banner.textContent = text;
+            banner.hidden = false;
+        }
+
+        function hideBanner() {
+            if (banner) {
+                banner.hidden = true;
+            }
+        }
+
+        function taskById(id) {
+            for (var i = 0; i < config.tasks.length; i++) {
+                if (config.tasks[i].id === id) {
+                    return config.tasks[i];
+                }
+            }
+
+            return null;
+        }
+
+        function send(taskId, predecessorId, operation) {
+            var task = taskById(taskId);
+            var predecessor = taskById(predecessorId);
+
+            if (!task || !predecessor) {
+                return;
+            }
+
+            post(endpoint, {
+                id: task.kb.task_id,
+                predecessor: predecessor.kb.task_id,
+                operation: operation
+            }, bridge.csrf_token).then(function () {
+                notify(container, labels.dependency_saved, false);
+                // The server decides the arrows and the critical path, so the
+                // chart is re-read rather than patched in place.
+                window.setTimeout(function () { window.location.reload(); }, 400);
+            }).catch(function (error) {
+                var message = String(error && error.message || '');
+                notify(
+                    container,
+                    message.indexOf('409') !== -1 ? labels.dependency_cycle : labels.save_error,
+                    true
+                );
+            });
+        }
+
+        function item(text, handler) {
+            var el = document.createElement('button');
+
+            el.type = 'button';
+            el.className = 'kb-gantt-menu-item';
+            el.textContent = text;
+            el.addEventListener('click', function (event) {
+                event.stopPropagation();
+                closeMenu();
+                handler();
+            });
+            menu.appendChild(el);
+        }
+
+        function openMenu(task, x, y) {
+            menu.innerHTML = '';
+
+            item(labels.add_predecessor, function () {
+                picking = task.id;
+                container.classList.add('kb-gantt-picking');
+                showBanner(labels.pick_predecessor);
+            });
+
+            var dependencies = task.dependencies || [];
+
+            if (dependencies.length) {
+                var heading = document.createElement('div');
+                heading.className = 'kb-gantt-menu-heading';
+                heading.textContent = labels.remove_dependency;
+                menu.appendChild(heading);
+
+                dependencies.forEach(function (id) {
+                    var predecessor = taskById(id);
+
+                    if (predecessor) {
+                        item('✗ ' + (predecessor.kb.title || id), function () {
+                            send(task.id, id, 'remove');
+                        });
+                    }
+                });
+            } else {
+                var empty = document.createElement('div');
+                empty.className = 'kb-gantt-menu-heading';
+                empty.textContent = labels.no_dependencies;
+                menu.appendChild(empty);
+            }
+
+            var bounds = container.getBoundingClientRect();
+            menu.style.left = (x - bounds.left) + 'px';
+            menu.style.top = (y - bounds.top) + 'px';
+            menu.hidden = false;
+        }
+
+        container.addEventListener('contextmenu', function (event) {
+            var wrapper = event.target.closest('.bar-wrapper');
+
+            if (!wrapper) {
+                return;
+            }
+
+            var task = taskById(wrapper.getAttribute('data-id'));
+
+            // Subtasks are not tasks in their own right, so they cannot carry
+            // a link.
+            if (!task || (task.kb && task.kb.type !== 'task')) {
+                return;
+            }
+
+            event.preventDefault();
+            stopPicking();
+            openMenu(task, event.clientX, event.clientY);
+        });
+
+        // Completing a pick. Captured so it runs before the library's own
+        // click handling opens the task.
+        container.addEventListener('click', function (event) {
+            if (picking === null) {
+                return;
+            }
+
+            var wrapper = event.target.closest('.bar-wrapper');
+
+            if (!wrapper) {
+                return;
+            }
+
+            var chosen = wrapper.getAttribute('data-id');
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (chosen !== picking) {
+                send(picking, chosen, 'add');
+            }
+
+            stopPicking();
+        }, true);
+
+        document.addEventListener('click', function (event) {
+            if (!menu.hidden && !menu.contains(event.target)) {
+                closeMenu();
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                closeMenu();
+                stopPicking();
+            }
+        });
+    }
+
     /* -------------------------------------------------------- zoom controls */
 
     /* View modes from finest to coarsest, with the days each column covers.
@@ -1129,6 +1336,7 @@
             keepStateClasses(chart, container, config.tasks);
             buildSidebar(container, chart, config, container.getAttribute('data-gantt-scope') || 'default');
             buildZoomControls(chart, container, config, storageKey);
+            attachDependencyEditing(chart, container, config);
 
             // "fit" is ours, not the library's: frame the whole plan instead
             // of a fixed point in time.

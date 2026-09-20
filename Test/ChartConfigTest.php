@@ -102,7 +102,7 @@ class ChartConfigTest extends PluginTestCase
         foreach ($controllers as $file) {
             $source = file_get_contents($file);
 
-            $pattern = "/'(dates|progress)' => [^\n]*->url->(\w+)\(/";
+            $pattern = "/'(dates|progress|dependency)' => [^\n]*->url->(\w+)\(/";
 
             if (! preg_match_all($pattern, $source, $matches)) {
                 $this->fail(basename($file).' declares no chart endpoints');

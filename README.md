@@ -23,6 +23,10 @@ library's complete feature set through Kanboard's settings and permissions.
 - **Milestones as diamonds** — tasks linked with "is a milestone of" are drawn
   the way every Gantt draws a milestone.
 - **Zoom** — step through the view modes, or fit the whole plan to the window.
+- **Critical path** — highlights the chain that decides when the plan
+  finishes, off by default.
+- **Edit dependencies from the chart** — right-click a bar to add or remove a
+  predecessor, writing ordinary Kanboard task links.
 - **Follows your theme** — light, dark and auto all work, and bars take their
   colour from the task or its category.
 
@@ -66,7 +70,8 @@ Once installed the plugin adds:
 | Project settings sidebar | **Gantt settings** — per-project overrides |
 
 Editing requires the same permission as editing the task itself: project
-members can move bars, project viewers get a read-only chart. Changing a
+members can move bars and edit dependencies — the role Kanboard core itself
+requires for task links — while project viewers get a read-only chart. Changing a
 project's dates on the cross-project chart requires being a manager of that
 project.
 
@@ -149,8 +154,14 @@ say.
 ### Kanboard data
 
 Task ordering (board position or start date), whether to show subtasks and
-closed tasks, which link types become dependency arrows, what opens a task
-(double click, single click or nothing) and where bar colours come from.
+closed tasks, whether to highlight the critical path, which link types become
+dependency arrows, what opens a task (double click, single click or nothing)
+and where bar colours come from.
+
+The critical path is worked out from the dependency graph and the durations,
+per project. Tasks missing a start or due date take no part in it, since a
+task with no duration cannot lengthen a chain. If the links form a cycle no
+path is reported, because a cycle has no longest chain.
 
 ## Development
 

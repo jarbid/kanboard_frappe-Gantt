@@ -332,3 +332,68 @@ body.kb-gantt-resizing {
 .kb-gantt-chart .kb-gantt-side-row.kb-gantt-critical-row .kb-gantt-side-title {
     font-weight: bold;
 }
+
+/* ------------------------------------------------- dependency editing -- */
+
+.kb-gantt-chart {
+    position: relative;
+}
+
+.kb-gantt-menu {
+    position: absolute;
+    z-index: 30;
+    min-width: 190px;
+    padding: 4px 0;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 3px;
+    background: var(--body-background-color, #fff);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.kb-gantt-menu-item {
+    display: block;
+    width: 100%;
+    padding: 5px 12px;
+    border: none;
+    background: none;
+    color: var(--font-color, #333);
+    font-size: 0.9em;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.kb-gantt-menu-item:hover {
+    background: var(--color-primary, #3876d3);
+    color: #fff;
+}
+
+.kb-gantt-menu-heading {
+    padding: 5px 12px 3px;
+    color: var(--color-light, #999);
+    font-size: 0.8em;
+    text-transform: uppercase;
+}
+
+/* While picking a predecessor, make it obvious the next click is a choice. */
+.kb-gantt-chart.kb-gantt-picking .bar-wrapper {
+    cursor: crosshair;
+}
+
+.kb-gantt-chart.kb-gantt-picking .bar-wrapper:hover .bar {
+    stroke: var(--color-primary, #3876d3);
+    stroke-width: 2px;
+}
+
+.kb-gantt-banner {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 31;
+    padding: 5px 14px;
+    border-radius: 3px;
+    background: var(--color-primary, #3876d3);
+    color: #fff;
+    font-size: 0.9em;
+}
