@@ -119,6 +119,35 @@ class ChartConfigTest extends PluginTestCase
     }
 
     /**
+     * The formatters put URLs into the same payload, and the bridge navigates
+     * to them with window.location. href() there sends the browser to a URL
+     * containing a literal "&amp;", which lands on "Page not found".
+     */
+    public function testFormattersBuildUrlsWithAPlainSeparator()
+    {
+        $formatters = array(
+            __DIR__.'/../Formatter/TaskGanttFormatter.php',
+            __DIR__.'/../Formatter/ProjectGanttFormatter.php',
+        );
+
+        foreach ($formatters as $file) {
+            $source = file_get_contents($file);
+
+            $this->assertStringNotContainsString(
+                'url->href(',
+                $source,
+                basename($file).': URLs in the chart payload must use url->to()'
+            );
+
+            $this->assertStringContainsString(
+                'url->to(',
+                $source,
+                basename($file).' is expected to build at least one URL'
+            );
+        }
+    }
+
+    /**
      * A task title containing markup must still survive the round trip, since
      * the labels are pre-escaped for the library and therefore already carry
      * entities when they are put into the attribute.

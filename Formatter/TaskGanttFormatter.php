@@ -168,7 +168,10 @@ class TaskGanttFormatter extends BaseFormatter implements FormatterInterface
                 'task_id' => (int) $task['id'],
                 'project_id' => $project_id,
                 'title' => $task['title'],
-                'url' => $this->helper->url->href('TaskViewController', 'show', array(
+                // A plain "&" separator: href() escapes it, and escaping the
+                // payload again for the data attribute would leave a literal
+                // "&amp;" in the URL the browser navigates to.
+                'url' => $this->helper->url->to('TaskViewController', 'show', array(
                     'project_id' => $project_id,
                     'task_id' => $task['id'],
                 )),

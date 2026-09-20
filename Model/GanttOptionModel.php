@@ -57,6 +57,20 @@ class GanttOptionModel extends Base
                 'group' => 'layout',
             ),
 
+            // The task column beside the chart. The library has no concept of
+            // one, so these drive markup the plugin renders itself.
+            'left_column' => array('type' => 'bool', 'default' => true, 'scope' => 'plugin', 'group' => 'layout'),
+            'left_column_width' => array('type' => 'int', 'default' => 260, 'scope' => 'plugin', 'group' => 'layout'),
+            'left_column_fields' => array(
+                'type' => 'set',
+                'default' => array('assignee'),
+                // The task id and its title are always shown, so they are not
+                // offered here.
+                'choices' => array('assignee', 'start', 'due', 'progress', 'category', 'swimlane', 'column'),
+                'scope' => 'plugin',
+                'group' => 'layout',
+            ),
+
             // ---- Timeline -----------------------------------------------
             'view_mode' => array(
                 'type' => 'enum',
@@ -384,6 +398,15 @@ class GanttOptionModel extends Base
             'ignore_dates' => array_column($this->parseDateList($values['ignore_dates']), 'date'),
             'enabled_view_modes' => $values['enabled_view_modes'],
             'open_task_on' => $values['open_task_on'],
+            'left_column' => $values['left_column'],
+            'left_column_width' => $values['left_column_width'],
+            'left_column_fields' => array_values($values['left_column_fields']),
+            // The bridge needs the row geometry to line the task column up
+            // with the bars, and the library only exposes it through options.
+            'row_geometry' => array(
+                'bar_height' => (int) $values['bar_height'],
+                'padding' => (int) $values['padding'],
+            ),
         );
     }
 

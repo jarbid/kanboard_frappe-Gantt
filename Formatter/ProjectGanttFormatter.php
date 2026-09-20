@@ -71,13 +71,13 @@ class ProjectGanttFormatter extends BaseFormatter implements FormatterInterface
                     'classes' => $classes,
                     'project_id' => (int) $project['id'],
                     'title' => $project['name'],
-                    'url' => $this->helper->url->href('ProjectViewController', 'show', array(
+                    'url' => $this->helper->url->to('ProjectViewController', 'show', array(
                         'project_id' => $project['id'],
                     )),
-                    'board_url' => $this->helper->url->href('BoardViewController', 'show', array(
+                    'board_url' => $this->helper->url->to('BoardViewController', 'show', array(
                         'project_id' => $project['id'],
                     )),
-                    'gantt_url' => $this->helper->url->href('TaskGanttController', 'show', array(
+                    'gantt_url' => $this->helper->url->to('TaskGanttController', 'show', array(
                         'project_id' => $project['id'],
                         'plugin' => 'FrappeGantt',
                     )),
