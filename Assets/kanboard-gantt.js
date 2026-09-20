@@ -11,6 +11,8 @@
     'use strict';
 
     var STORAGE_PREFIX = 'kb-frappe-gantt:view-mode:';
+    var SIDEBAR_WIDTH_PREFIX = 'kb-frappe-gantt:sidebar-width:';
+    var SIDEBAR_FIELDS_PREFIX = 'kb-frappe-gantt:sidebar-fields:';
 
     /* --------------------------------------------------------------- utils */
 
@@ -379,6 +381,371 @@
         return options;
     }
 
+    /* ----------------------------------------------------- the task column */
+
+    /**
+     * Fields the task column can show. The task id and its title are always
+     * present, so they are not listed here.
+     */
+    var SIDEBAR_FIELDS = ['assignee', 'start', 'due', 'progress', 'category', 'swimlane', 'column'];
+
+    /**
+     * Label for one optional field, reusing the labels the popup already has.
+     */
+    function fieldLabel(field, labels) {
+        switch (field) {
+            case 'start': return labels.start_date;
+            case 'due': return labels.due_date;
+            default: return labels[field] || field;
+        }
+    }
+
+    /**
+     * Value of one optional field for a bar.
+     */
+    function fieldValue(task, field, labels) {
+        var kb = task.kb || {};
+
+        switch (field) {
+            case 'assignee': return kb.assignee || '';
+            case 'start': return kb.has_start === false ? labels.not_defined : task.start;
+            case 'due': return kb.has_due === false ? labels.not_defined : task.end;
+            case 'progress': return Math.round(task.progress || 0) + '%';
+            case 'category': return kb.category || '';
+            case 'swimlane': return kb.swimlane || '';
+            case 'column': return kb.column || '';
+        }
+
+        return '';
+    }
+
+    /**
+     * Build one row of the task column.
+     *
+     * The row is sized to the library's own geometry rather than measured
+     * from the DOM: a bar sits at
+     *     header_height + padding / 2 + index * (bar_height + padding)
+     * so a row of bar_height with a padding gap lines up with it exactly, at
+     * any zoom level and after any re-render.
+     */
+    function buildSidebarRow(task, fields, labels, geometry) {
+        var kb = task.kb || {};
+        var row = document.createElement('div');
+
+        row.className = 'kb-gantt-side-row';
+        row.style.height = geometry.bar_height + 'px';
+        row.style.marginBottom = geometry.padding + 'px';
+        row.setAttribute('data-id', task.id);
+
+        var name = document.createElement('div');
+        name.className = 'kb-gantt-side-name';
+
+        if (kb.type === 'subtask') {
+            name.classList.add('kb-gantt-side-subtask');
+        }
+
+        if (kb.type === 'task' && kb.task_id) {
+            var id = document.createElement('span');
+            id.className = 'kb-gantt-side-id';
+            id.textContent = '#' + kb.task_id;
+            name.appendChild(id);
+        }
+
+        if (kb.type === 'project') {
+            // The original Kanboard chart put the board and gantt of each
+            // project within reach here; keep that.
+            [['open_board', 'board_url', 'th'], ['open_gantt', 'gantt_url', 'sliders']].forEach(function (entry) {
+                if (!kb[entry[1]]) {
+                    return;
+                }
+
+                var shortcut = document.createElement('a');
+                shortcut.className = 'kb-gantt-side-icon';
+                shortcut.href = kb[entry[1]];
+                shortcut.title = labels[entry[0]] || '';
+                shortcut.innerHTML = '<i class="fa fa-' + entry[2] + '" aria-hidden="true"></i>';
+                name.appendChild(shortcut);
+            });
+        }
+
+        var title = kb.url ? document.createElement('a') : document.createElement('span');
+
+        if (kb.url) {
+            title.href = kb.url;
+        }
+
+        title.className = 'kb-gantt-side-title';
+        title.textContent = kb.title || task.name || '';
+        title.title = kb.title || '';
+        name.appendChild(title);
+        row.appendChild(name);
+
+        fields.forEach(function (field) {
+            var cell = document.createElement('div');
+            cell.className = 'kb-gantt-side-cell kb-gantt-side-' + field;
+            cell.textContent = fieldValue(task, field, labels);
+            cell.title = cell.textContent;
+            row.appendChild(cell);
+        });
+
+        return row;
+    }
+
+    /**
+     * Menu for choosing which optional fields the column shows.
+     */
+    function buildFieldPicker(head, state, labels, onChange) {
+        var toggle = document.createElement('button');
+
+        toggle.type = 'button';
+        toggle.className = 'kb-gantt-side-toggle';
+        toggle.textContent = labels.columns;
+
+        var menu = document.createElement('div');
+        menu.className = 'kb-gantt-side-menu';
+        menu.hidden = true;
+
+        SIDEBAR_FIELDS.forEach(function (field) {
+            var item = document.createElement('label');
+            var box = document.createElement('input');
+
+            box.type = 'checkbox';
+            box.checked = state.fields.indexOf(field) !== -1;
+
+            box.addEventListener('change', function () {
+                var index = state.fields.indexOf(field);
+
+                if (box.checked && index === -1) {
+                    state.fields.push(field);
+                } else if (!box.checked && index !== -1) {
+                    state.fields.splice(index, 1);
+                }
+
+                // Keep a stable order so the columns do not jump around.
+                state.fields.sort(function (a, b) {
+                    return SIDEBAR_FIELDS.indexOf(a) - SIDEBAR_FIELDS.indexOf(b);
+                });
+
+                onChange();
+            });
+
+            item.appendChild(box);
+            item.appendChild(document.createTextNode(' ' + fieldLabel(field, labels)));
+            menu.appendChild(item);
+        });
+
+        toggle.addEventListener('click', function (event) {
+            event.stopPropagation();
+            menu.hidden = !menu.hidden;
+        });
+
+        document.addEventListener('click', function (event) {
+            if (!menu.hidden && !menu.contains(event.target) && event.target !== toggle) {
+                menu.hidden = true;
+            }
+        });
+
+        head.appendChild(toggle);
+        head.appendChild(menu);
+    }
+
+    /**
+     * Let the divider between the column and the chart be dragged.
+     */
+    function attachSidebarResizer(resizer, sidebar, state, persist) {
+        var dragging = false;
+        var startX = 0;
+        var startWidth = 0;
+
+        resizer.addEventListener('mousedown', function (event) {
+            dragging = true;
+            startX = event.clientX;
+            startWidth = sidebar.offsetWidth;
+            document.body.classList.add('kb-gantt-resizing');
+            event.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function (event) {
+            if (!dragging) {
+                return;
+            }
+
+            var width = Math.min(760, Math.max(120, startWidth + (event.clientX - startX)));
+            state.width = width;
+            sidebar.style.width = width + 'px';
+        });
+
+        document.addEventListener('mouseup', function () {
+            if (!dragging) {
+                return;
+            }
+
+            dragging = false;
+            document.body.classList.remove('kb-gantt-resizing');
+            persist();
+        });
+    }
+
+    /**
+     * Render the task column beside the chart and keep the two aligned.
+     */
+    function buildSidebar(container, chart, config, scope) {
+        var bridge = config.bridge || {};
+        var labels = bridge.labels || {};
+        var geometry = bridge.row_geometry || { bar_height: 30, padding: 18 };
+
+        if (!bridge.left_column) {
+            return;
+        }
+
+        var widthKey = SIDEBAR_WIDTH_PREFIX + scope;
+        var fieldsKey = SIDEBAR_FIELDS_PREFIX + scope;
+        var storedFields = readStorage(fieldsKey);
+        var storedWidth = parseInt(readStorage(widthKey), 10);
+
+        var state = {
+            width: storedWidth > 0 ? storedWidth : (bridge.left_column_width || 260),
+            fields: (storedFields ? storedFields.split(',') : (bridge.left_column_fields || []))
+                .filter(function (field) {
+                    return SIDEBAR_FIELDS.indexOf(field) !== -1;
+                })
+        };
+
+        function persist() {
+            writeStorage(widthKey, String(state.width));
+            writeStorage(fieldsKey, state.fields.join(','));
+        }
+
+        var sidebar = document.createElement('div');
+        sidebar.className = 'kb-gantt-side';
+        sidebar.style.width = state.width + 'px';
+
+        var head = document.createElement('div');
+        head.className = 'kb-gantt-side-head';
+
+        var body = document.createElement('div');
+        body.className = 'kb-gantt-side-body';
+
+        var rows = document.createElement('div');
+        rows.className = 'kb-gantt-side-rows';
+
+        body.appendChild(rows);
+        sidebar.appendChild(head);
+        sidebar.appendChild(body);
+
+        var resizer = document.createElement('div');
+        resizer.className = 'kb-gantt-side-resizer';
+
+        var target = container.querySelector('.kb-gantt-target') || container;
+        container.classList.add('kb-gantt-has-side');
+        target.parentNode.insertBefore(sidebar, target);
+        target.parentNode.insertBefore(resizer, target);
+
+        function paint() {
+            // The header is as tall as the chart's own, so row zero starts on
+            // the same line as the first bar.
+            head.style.height = chart.config.header_height + 'px';
+            rows.style.paddingTop = (geometry.padding / 2) + 'px';
+            rows.innerHTML = '';
+
+            chart.tasks.forEach(function (task) {
+                rows.appendChild(buildSidebarRow(task, state.fields, labels, geometry));
+            });
+
+            matchChartHeight();
+        }
+
+        /**
+         * Give the column's body exactly the height of the chart's scrolling
+         * area.
+         *
+         * Without this the column is as tall as its own rows, so it has
+         * nothing to scroll: when container_height makes the chart scroll
+         * internally, setting its scrollTop does nothing and the two panes
+         * drift apart by the whole scroll distance. When the chart is set to
+         * grow instead, this resolves to the full height and the page scrolls
+         * both panes together, which is also what we want.
+         */
+        function matchChartHeight() {
+            if (!chart.$container) {
+                return;
+            }
+
+            body.style.height = chart.$container.clientHeight + 'px';
+        }
+
+        function refresh() {
+            paint();
+            persist();
+        }
+
+        buildFieldPicker(head, state, labels, refresh);
+        attachSidebarResizer(resizer, sidebar, state, persist);
+        paint();
+
+        // Keep the two panes on the same line while either one scrolls.
+        var scroller = chart.$container;
+        var syncing = false;
+
+        function mirror(from, to) {
+            if (syncing) {
+                return;
+            }
+
+            syncing = true;
+            to.scrollTop = from.scrollTop;
+            syncing = false;
+        }
+
+        scroller.addEventListener('scroll', function () { mirror(scroller, body); });
+        body.addEventListener('scroll', function () { mirror(body, scroller); });
+
+        // The chart reflows with the window, so the column has to be
+        // re-measured against it.
+        window.addEventListener('resize', matchChartHeight);
+
+        // Inserting the column narrowed the chart after it had already placed
+        // its initial horizontal scroll, which leaves it looking at the wrong
+        // dates. Ask it to scroll again now the width is final.
+        if (typeof chart.set_scroll_position === 'function') {
+            chart.set_scroll_position(chart.options.scroll_to || 'today');
+        }
+
+        // Hovering either side highlights the other.
+        rows.addEventListener('mouseover', function (event) {
+            var row = event.target.closest('.kb-gantt-side-row');
+
+            if (!row) {
+                return;
+            }
+
+            var bar = container.querySelector('.bar-wrapper[data-id="' + row.getAttribute('data-id') + '"]');
+
+            if (bar) {
+                bar.classList.add('kb-gantt-hover');
+            }
+        });
+
+        rows.addEventListener('mouseout', function () {
+            var hovered = container.querySelector('.bar-wrapper.kb-gantt-hover');
+
+            if (hovered) {
+                hovered.classList.remove('kb-gantt-hover');
+            }
+        });
+
+        // A re-render rebuilds the bars and can change the header height, so
+        // the column is repainted alongside it.
+        var render = chart.render.bind(chart);
+
+        chart.render = function () {
+            render();
+            paint();
+        };
+
+        return paint;
+    }
+
     /* ------------------------------------------------------- state classes */
 
     /**
@@ -495,6 +862,7 @@
             var chart = new window.Gantt(target, config.tasks, options);
             container._gantt = chart;
             keepStateClasses(chart, container, config.tasks);
+            buildSidebar(container, chart, config, container.getAttribute('data-gantt-scope') || 'default');
         } catch (e) {
             window.console && console.error('Frappe Gantt: unable to render the chart', e);
         }

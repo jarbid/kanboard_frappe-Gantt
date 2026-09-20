@@ -68,6 +68,7 @@ abstract class BaseGanttController extends BaseController
             'time_estimated' => t('Time estimated'),
             'hours' => t('hours'),
             'subtask' => t('Subtask'),
+            'columns' => t('Columns'),
             'saved' => t('Saved'),
             'save_error' => t('Unable to save this change'),
             'readonly_subtask' => t('Subtasks have no dates of their own and cannot be moved.'),

@@ -131,3 +131,144 @@
     color: var(--color-light, #999);
     font-size: 0.9em;
 }
+
+/* --------------------------------------------------------- task column -- */
+
+/* The chart and its task column sit side by side; the chart takes the rest. */
+.kb-gantt-chart.kb-gantt-has-side {
+    display: flex;
+    align-items: stretch;
+}
+
+.kb-gantt-chart.kb-gantt-has-side .kb-gantt-target {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.kb-gantt-side {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border-color, #ddd);
+    border-right: none;
+    border-radius: 4px 0 0 4px;
+    background: var(--body-background-color, #fff);
+}
+
+.kb-gantt-side-head {
+    /* The height set from the chart's header must include the border, or
+       every row sits a pixel low. */
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 8px;
+    position: relative;
+    border-bottom: 1px solid var(--border-color, #ddd);
+    background: var(--column-header-background-color, #fbfbfb);
+}
+
+.kb-gantt-side-toggle {
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 3px;
+    background: var(--body-background-color, #fff);
+    color: var(--font-color, #333);
+    font-size: 0.85em;
+    padding: 2px 8px;
+    cursor: pointer;
+}
+
+.kb-gantt-side-menu {
+    position: absolute;
+    top: 100%;
+    right: 8px;
+    z-index: 20;
+    min-width: 170px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 3px;
+    background: var(--body-background-color, #fff);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.kb-gantt-side-menu label {
+    display: block;
+    padding: 3px 0;
+    font-weight: normal;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+/* The body scrolls in step with the chart, so its own bars stay hidden. */
+.kb-gantt-side-body {
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.kb-gantt-side-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    box-sizing: border-box;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.kb-gantt-side-row:hover {
+    background: var(--task-hover-background-color, rgba(0, 0, 0, 0.04));
+}
+
+.kb-gantt-side-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kb-gantt-side-id {
+    color: var(--color-light, #999);
+    margin-right: 4px;
+}
+
+.kb-gantt-side-icon {
+    margin-right: 4px;
+}
+
+.kb-gantt-side-subtask {
+    padding-left: 16px;
+    font-style: italic;
+    opacity: 0.85;
+}
+
+.kb-gantt-side-cell {
+    flex: 0 0 auto;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--color-light, #777);
+}
+
+.kb-gantt-side-resizer {
+    flex: 0 0 5px;
+    cursor: col-resize;
+    background: transparent;
+    border-left: 1px solid var(--border-color, #ddd);
+    border-right: 1px solid var(--border-color, #ddd);
+}
+
+.kb-gantt-side-resizer:hover {
+    background: var(--color-primary, #3876d3);
+}
+
+/* Dragging the divider must not select text across the page. */
+body.kb-gantt-resizing {
+    user-select: none;
+    cursor: col-resize;
+}
+
+/* Hovering a row lifts the matching bar. */
+.kb-gantt-chart .bar-wrapper.kb-gantt-hover .bar {
+    filter: brightness(0.92);
+}
