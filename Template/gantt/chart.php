@@ -27,5 +27,12 @@ $config = htmlspecialchars(
     <div class="kb-gantt-target"></div>
 </div>
 
+<?php
+// Linked here rather than through template:layout:css, because the hook's
+// asset helper always sets media="screen", which would make print rules
+// inside the main stylesheet dead.
+?>
+<?= $this->asset->css('plugins/FrappeGantt/Assets/kanboard-gantt-print.css', true, 'print') ?>
+
 <?= $this->asset->js('plugins/FrappeGantt/Assets/vendor/frappe-gantt.umd.js') ?>
 <?= $this->asset->js('plugins/FrappeGantt/Assets/kanboard-gantt.js') ?>

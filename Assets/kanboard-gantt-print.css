@@ -1,0 +1,48 @@
+/*
+ * Print rules for the Gantt chart.
+ *
+ * These live in their own file because Kanboard's asset helper links
+ * hook-registered stylesheets with media="screen", so an @media print block
+ * inside the main stylesheet can never apply. The chart template links this
+ * one with media="print" instead.
+ */
+
+/* Everything around the chart is navigation, which is noise on paper. */
+body > header,
+.page-header,
+.sidebar,
+.menu-inline,
+.dropdown,
+.kb-gantt-zoom,
+.kb-gantt-side-toggle,
+.kb-gantt-side-resizer,
+.kb-gantt-menu,
+.kb-gantt-banner,
+.kb-gantt-toast,
+.alert {
+    display: none !important;
+}
+
+/* The chart normally scrolls inside its own box; on paper it has to run to
+   its full size so nothing is clipped away. */
+.kb-gantt-chart,
+.kb-gantt-chart .gantt-container,
+.kb-gantt-side-body {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+}
+
+/* Keep the colours rather than printing grey boxes. */
+.kb-gantt-chart .bar-wrapper .bar,
+.kb-gantt-chart .bar-wrapper .bar-progress,
+.kb-gantt-chart .kb-gantt-diamond,
+.kb-gantt-chart .holiday-highlight {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+@page {
+    size: landscape;
+    margin: 10mm;
+}

@@ -750,6 +750,302 @@
         return paint;
     }
 
+    /* -------------------------------------------------------------- export */
+
+    /* Properties worth carrying onto the exported copy. Serialising an SVG
+       drops every rule from the stylesheet, so the ones that matter are
+       written onto the elements themselves. */
+    var EXPORT_STYLES = [
+        'fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-dasharray',
+        'font-family', 'font-size', 'font-weight', 'text-anchor', 'opacity',
+        'dominant-baseline', 'text-decoration', 'visibility', 'display'
+    ];
+
+    var EXPORT_FONT = 'font-family:sans-serif;font-size:12px;';
+
+    /**
+     * Copy the computed style of every node onto its clone.
+     *
+     * A standalone SVG has no access to the page's stylesheet, so without
+     * this the export comes out as black shapes on white.
+     */
+    function inlineStyles(source, clone) {
+        var from = source.querySelectorAll('*');
+        var to = clone.querySelectorAll('*');
+
+        for (var i = 0; i < from.length; i++) {
+            var computed = window.getComputedStyle(from[i]);
+            var declarations = [];
+
+            for (var j = 0; j < EXPORT_STYLES.length; j++) {
+                var value = computed.getPropertyValue(EXPORT_STYLES[j]);
+
+                if (value) {
+                    declarations.push(EXPORT_STYLES[j] + ':' + value);
+                }
+            }
+
+            to[i].setAttribute('style', declarations.join(';'));
+        }
+    }
+
+    function svgText(x, y, text, extraStyle, anchor) {
+        var node = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+
+        node.setAttribute('x', x);
+        node.setAttribute('y', y);
+
+        if (anchor) {
+            node.setAttribute('text-anchor', anchor);
+        }
+
+        node.setAttribute('style', EXPORT_FONT + (extraStyle || 'fill:#333'));
+        node.textContent = text;
+
+        return node;
+    }
+
+    /**
+     * The date header, which the library lays out as absolutely positioned
+     * divs rather than inside the SVG. Without this the export has no dates
+     * on it at all.
+     */
+    function exportHeader(container, origin, offsetX) {
+        var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+        function add(selector, style) {
+            container.querySelectorAll(selector).forEach(function (el) {
+                var text = (el.textContent || '').trim();
+
+                if (!text) {
+                    return;
+                }
+
+                var rect = el.getBoundingClientRect();
+
+                group.appendChild(svgText(
+                    rect.left + rect.width / 2 - origin.left + offsetX,
+                    // Baselines sit below the box top, so text is placed
+                    // against the vertical centre of the element it came from.
+                    rect.top + rect.height / 2 - origin.top + 4,
+                    text,
+                    style,
+                    'middle'
+                ));
+            });
+        }
+
+        add('.upper-text', 'fill:#333;font-weight:bold');
+        add('.lower-text', 'fill:#555');
+
+        return group;
+    }
+
+    /**
+     * The task column, which is ours and also HTML.
+     *
+     * Each cell is written separately: the row's textContent runs the id,
+     * title and fields together with no spaces.
+     */
+    function exportTaskColumn(container, origin, height) {
+        var side = container.querySelector('.kb-gantt-side');
+
+        if (!side) {
+            return null;
+        }
+
+        var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        var sideOrigin = side.getBoundingClientRect();
+
+        container.querySelectorAll('.kb-gantt-side-row').forEach(function (row) {
+            var rowRect = row.getBoundingClientRect();
+            var y = rowRect.top + rowRect.height / 2 - origin.top + 4;
+
+            // A row scrolled outside the chart's own box would land off the
+            // image.
+            if (y < 0 || y > height) {
+                return;
+            }
+
+            row.querySelectorAll('.kb-gantt-side-name, .kb-gantt-side-cell').forEach(function (cell) {
+                // The id and the title are separate elements held apart by a
+                // margin, so their textContent runs together without one.
+                var parts = [];
+
+                cell.childNodes.forEach(function (node) {
+                    var value = (node.textContent || '').replace(/\s+/g, ' ').trim();
+
+                    if (value) {
+                        parts.push(value);
+                    }
+                });
+
+                var text = parts.join(' ');
+
+                if (!text) {
+                    return;
+                }
+
+                var rect = cell.getBoundingClientRect();
+                var bold = row.classList.contains('kb-gantt-critical-row') &&
+                    cell.classList.contains('kb-gantt-side-name');
+
+                group.appendChild(svgText(
+                    rect.left - sideOrigin.left + 4,
+                    y,
+                    text,
+                    bold ? 'fill:#333;font-weight:bold' : 'fill:#333'
+                ));
+            });
+        });
+
+        return { group: group, width: side.offsetWidth };
+    }
+
+    /**
+     * Render the chart to a PNG and hand it to the browser.
+     *
+     * Done with the canvas the browser already has rather than a bundled PDF
+     * library: the Content-Security-Policy rules out a CDN, and vendoring one
+     * would roughly double the size of the plugin for a second output format
+     * that printing already covers.
+     */
+    function exportPng(container, bridge) {
+        var svg = container.querySelector('svg');
+
+        if (!svg) {
+            return;
+        }
+
+        var labels = bridge.labels || {};
+        var origin = svg.getBoundingClientRect();
+        var width = svg.width.baseVal.value || origin.width;
+        var height = svg.height.baseVal.value || origin.height;
+        var clone = svg.cloneNode(true);
+
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        inlineStyles(svg, clone);
+
+        var column = exportTaskColumn(container, origin, height);
+        var offsetX = column ? column.width : 0;
+
+        // Make room for the column by shifting everything the SVG already
+        // holds to the right.
+        if (offsetX) {
+            var shifted = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            shifted.setAttribute('transform', 'translate(' + offsetX + ' 0)');
+
+            while (clone.firstChild) {
+                shifted.appendChild(clone.firstChild);
+            }
+
+            clone.appendChild(shifted);
+            clone.appendChild(column.group);
+        }
+
+        clone.appendChild(exportHeader(container, origin, offsetX));
+
+        var total = width + offsetX;
+
+        // Painted last but inserted first, so it sits behind everything and,
+        // crucially, outside the shifted group -- otherwise the column area
+        // is left transparent and comes out black.
+        var background = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        background.setAttribute('x', 0);
+        background.setAttribute('y', 0);
+        background.setAttribute('width', total);
+        background.setAttribute('height', height);
+        background.setAttribute('fill', window.getComputedStyle(document.body).backgroundColor || '#ffffff');
+        clone.insertBefore(background, clone.firstChild);
+
+        clone.setAttribute('width', total);
+        clone.setAttribute('height', height);
+        clone.setAttribute('viewBox', '0 0 ' + total + ' ' + height);
+
+        var markup = new XMLSerializer().serializeToString(clone);
+        var image = new Image();
+        var scale = window.devicePixelRatio > 1 ? 2 : 1;
+
+        image.onload = function () {
+            var canvas = document.createElement('canvas');
+            canvas.width = total * scale;
+            canvas.height = height * scale;
+
+            var context = canvas.getContext('2d');
+            context.scale(scale, scale);
+            context.drawImage(image, 0, 0);
+
+            canvas.toBlob(function (blob) {
+                if (!blob) {
+                    notify(container, labels.export_error, true);
+                    return;
+                }
+
+                var url = URL.createObjectURL(blob);
+                var link = document.createElement('a');
+
+                link.href = url;
+                link.download = (bridge.export_name || 'gantt') + '.png';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        };
+
+        image.onerror = function () {
+            notify(container, labels.export_error, true);
+        };
+
+        // A data URL keeps the image same-origin, so the canvas stays clean
+        // and toBlob is allowed.
+        image.src = 'data:image/svg+xml;base64,' +
+            window.btoa(unescape(encodeURIComponent(markup)));
+    }
+
+    /**
+     * Buttons for taking the chart out of the browser.
+     */
+    function buildExportControls(chart, container, config) {
+        var bridge = config.bridge || {};
+        var labels = bridge.labels || {};
+
+        function inject() {
+            var header = container.querySelector('.side-header');
+
+            if (!header || header.querySelector('.kb-gantt-export')) {
+                return;
+            }
+
+            function button(text, title, handler) {
+                var el = document.createElement('button');
+
+                el.type = 'button';
+                el.className = 'kb-gantt-zoom kb-gantt-export';
+                el.textContent = text;
+                el.title = title;
+                el.addEventListener('click', handler);
+                header.appendChild(el);
+            }
+
+            button('\u2399', labels.print || 'Print', function () {
+                window.print();
+            });
+            button('\u2913', labels.export_png || 'Download as PNG', function () {
+                exportPng(container, bridge);
+            });
+        }
+
+        var render = chart.render.bind(chart);
+
+        chart.render = function () {
+            render();
+            inject();
+        };
+
+        inject();
+    }
+
     /* --------------------------------------------------- dependency editing */
 
     /**
@@ -1337,6 +1633,7 @@
             buildSidebar(container, chart, config, container.getAttribute('data-gantt-scope') || 'default');
             buildZoomControls(chart, container, config, storageKey);
             attachDependencyEditing(chart, container, config);
+            buildExportControls(chart, container, config);
 
             // "fit" is ours, not the library's: frame the whole plan instead
             // of a fixed point in time.

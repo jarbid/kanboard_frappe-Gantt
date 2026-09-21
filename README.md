@@ -27,6 +27,8 @@ library's complete feature set through Kanboard's settings and permissions.
   finishes, off by default.
 - **Edit dependencies from the chart** — right-click a bar to add or remove a
   predecessor, writing ordinary Kanboard task links.
+- **Export and print** — download the chart as a PNG, or print it (and so
+  save it as a PDF) with the page furniture stripped out.
 - **Follows your theme** — light, dark and auto all work, and bars take their
   colour from the task or its category.
 

@@ -34,6 +34,7 @@ abstract class BaseGanttController extends BaseController
                 'editable' => $editable,
                 'endpoints' => $endpoints,
                 'csrf_token' => $this->token->getReusableCSRFToken(),
+                'export_name' => $this->getExportName(),
                 'labels' => $this->getLabels(),
             ),
         );
@@ -45,6 +46,28 @@ abstract class BaseGanttController extends BaseController
      *
      * @return array
      */
+    /**
+     * Filename for an exported chart, without an extension.
+     *
+     * Derived from the project when there is one, so several exports do not
+     * all land in the downloads folder called "gantt".
+     */
+    protected function getExportName()
+    {
+        $project_id = $this->request->getIntegerParam('project_id');
+
+        if ($project_id > 0) {
+            $project = $this->projectModel->getById($project_id);
+
+            if (! empty($project['name'])) {
+                $name = preg_replace('/[^A-Za-z0-9_-]+/', '-', $project['name']);
+                return 'gantt-'.trim($name, '-');
+            }
+        }
+
+        return 'gantt';
+    }
+
     protected function getLabels()
     {
         return array(
@@ -79,6 +102,9 @@ abstract class BaseGanttController extends BaseController
             'no_dependencies' => t('This task has no dependencies'),
             'dependency_saved' => t('Dependency saved'),
             'dependency_cycle' => t('This would create a circular dependency'),
+            'print' => t('Print'),
+            'export_png' => t('Download as PNG'),
+            'export_error' => t('Unable to produce the image'),
             'saved' => t('Saved'),
             'save_error' => t('Unable to save this change'),
             'readonly_subtask' => t('Subtasks have no dates of their own and cannot be moved.'),
